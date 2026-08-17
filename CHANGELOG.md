@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.12.2] - 2026-08-17 [Changes][v0.12.2]
+
+### Features
+
+- **Common word-deletion hotkeys**: Bind `Ctrl+Backspace` to [`TextArea::delete_word`] and `Ctrl+Delete` to [`TextArea::delete_next_word`] in the default key map, matching the de-facto terminal/editor convention (readline, VS Code, opencode).
+
 ## [0.12.1] - 2026-07-10 [Changes][v0.12.1]
 
 ### Features

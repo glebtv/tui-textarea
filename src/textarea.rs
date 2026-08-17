@@ -480,6 +480,12 @@ impl<'a> TextArea<'a> {
                 ctrl: false,
                 alt: true,
                 ..
+            }
+            | Input {
+                key: Key::Backspace,
+                ctrl: true,
+                alt: false,
+                ..
             } => self.delete_word(),
             Input {
                 key: Key::Delete,
@@ -491,6 +497,12 @@ impl<'a> TextArea<'a> {
                 key: Key::Char('d'),
                 ctrl: false,
                 alt: true,
+                ..
+            }
+            | Input {
+                key: Key::Delete,
+                ctrl: true,
+                alt: false,
                 ..
             } => self.delete_next_word(),
             Input {
@@ -3293,5 +3305,96 @@ mod tests {
         }));
 
         assert!(panic.is_err());
+    }
+
+    fn key_input(key: Key, ctrl: bool, alt: bool) -> Input {
+        Input {
+            key,
+            ctrl,
+            alt,
+            shift: false,
+        }
+    }
+
+    #[test]
+    fn ctrl_backspace_deletes_word_before_cursor() {
+        let mut textarea = TextArea::from(["aaa bbb ccc"]);
+        textarea.move_cursor(CursorMove::End);
+
+        assert!(textarea.input(key_input(Key::Backspace, true, false)));
+
+        assert_eq!(textarea.lines(), ["aaa bbb "]);
+        assert_eq!(textarea.cursor(), (0, 8));
+    }
+
+    #[test]
+    fn ctrl_backspace_at_whitespace_skips_run_and_deletes_previous_word() {
+        let mut textarea = TextArea::from(["aaa   bbb"]);
+        textarea.move_cursor(CursorMove::End);
+
+        textarea.input(key_input(Key::Backspace, true, false));
+
+        assert_eq!(textarea.lines(), ["aaa   "]);
+        assert_eq!(textarea.cursor(), (0, 6));
+    }
+
+    #[test]
+    fn ctrl_delete_deletes_word_after_cursor() {
+        let mut textarea = TextArea::from(["aaa bbb ccc"]);
+
+        assert!(textarea.input(key_input(Key::Delete, true, false)));
+
+        assert_eq!(textarea.lines(), [" bbb ccc"]);
+        assert_eq!(textarea.cursor(), (0, 0));
+    }
+
+    #[test]
+    fn ctrl_delete_at_end_of_word_deletes_next_word() {
+        let mut textarea = TextArea::from(["aaa bbb ccc"]);
+        textarea.move_cursor(CursorMove::Jump(0, 4));
+
+        assert!(textarea.input(key_input(Key::Delete, true, false)));
+
+        assert_eq!(textarea.lines(), ["aaa  ccc"]);
+        assert_eq!(textarea.cursor(), (0, 4));
+    }
+
+    #[test]
+    fn plain_backspace_still_deletes_single_char() {
+        let mut textarea = TextArea::from(["aaa bbb"]);
+        textarea.move_cursor(CursorMove::End);
+
+        assert!(textarea.input(key_input(Key::Backspace, false, false)));
+
+        assert_eq!(textarea.lines(), ["aaa bb"]);
+    }
+
+    #[test]
+    fn plain_delete_still_deletes_single_char() {
+        let mut textarea = TextArea::from(["aaa bbb"]);
+
+        assert!(textarea.input(key_input(Key::Delete, false, false)));
+
+        assert_eq!(textarea.lines(), ["aa bbb"]);
+    }
+
+    #[test]
+    fn alt_backspace_still_deletes_word() {
+        let mut textarea = TextArea::from(["aaa bbb ccc"]);
+        textarea.move_cursor(CursorMove::End);
+
+        assert!(textarea.input(key_input(Key::Backspace, false, true)));
+
+        assert_eq!(textarea.lines(), ["aaa bbb "]);
+    }
+
+    #[test]
+    fn ctrl_w_still_deletes_word() {
+        let mut textarea = TextArea::from(["aaa bbb ccc"]);
+        textarea.move_cursor(CursorMove::End);
+
+        assert!(textarea.input(key_input(Key::Char('w'), true, false)));
+
+        assert_eq!(textarea.lines(), ["aaa bbb "]);
     }
 }
