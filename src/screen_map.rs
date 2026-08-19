@@ -225,18 +225,40 @@ mod tests {
     }
 
     fn assert_round_trips(textarea: &TextArea<'_>) {
+        // Word-wrap drops separator whitespace that never fits a row (matching ratatui).
+        // Such positions have no screen representation, so a detached coordinate
+        // round-trip is impossible for them — only the attached (explicit dc) round-trip
+        // is asserted, plus stability of the detached mapping.
+        let screen_lines = textarea.screen_lines.borrow().clone();
         for (row, line) in textarea.lines.iter().enumerate() {
+            let rows_for_line: Vec<WrappedLine> = screen_lines
+                .iter()
+                .filter(|sl| sl.wrapped.row == row)
+                .map(|sl| sl.wrapped)
+                .collect();
             for col in 0..=line.chars().count() {
                 let dc = DataCursor(row, col);
                 let sc = textarea.data_to_screen_cursor(dc);
                 assert_eq!(textarea.screen_to_data_cursor(sc), dc);
 
                 let detached = ScreenCursor { dc: None, ..sc };
-                assert_eq!(textarea.screen_to_data_cursor(detached), dc);
-                assert_eq!(
-                    textarea.data_to_screen_cursor(textarea.screen_to_data_cursor(detached)),
-                    sc
-                );
+                let back = textarea.screen_to_data_cursor(detached);
+                let visible = rows_for_line.iter().any(|w| {
+                    let (lo, hi) = if w.last_in_row {
+                        (w.start_col, w.end_col)
+                    } else {
+                        (w.start_col, w.end_col.saturating_sub(1))
+                    };
+                    lo <= col && col <= hi
+                });
+                if visible {
+                    assert_eq!(back, dc, "detached round-trip failed for {dc:?}");
+                    assert_eq!(textarea.data_to_screen_cursor(back), sc);
+                } else {
+                    // Position inside dropped whitespace: the detached mapping resolves
+                    // to the nearest representable position and must be stable.
+                    assert_eq!(textarea.data_to_screen_cursor(back), sc);
+                }
             }
         }
     }
